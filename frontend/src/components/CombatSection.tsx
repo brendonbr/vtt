@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { API_BASE } from './vtt/vttConfig'
 
 export type AbilityKey = 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma'
 export type ActivationType = 'action' | 'bonusAction' | 'reaction'
@@ -160,6 +161,7 @@ interface CombatSectionProps {
   character: DndCharacter
   itemTemplates?: ItemTemplate[]
   onChange: (character: DndCharacter) => void
+  onCombatMessage?: (message: string) => void
 }
 
 const ACTION_LABELS: Record<ActivationType, string> = {
@@ -207,6 +209,104 @@ const abilityModifier = (score: number) => Math.floor(((Number(score) || 10) - 1
 const formatBonus = (value?: number) => `${Number(value || 0) >= 0 ? '+' : ''}${Number(value || 0)}`
 const normalizeText = (value?: string) => String(value || '').trim().toLowerCase()
 const templateMapCache = new WeakMap<ItemTemplate[], Record<string, ItemTemplate>>()
+
+type DiceTerm = {
+  count: number
+  sides: number
+}
+
+type ParsedDiceExpression = {
+  diceTerms: DiceTerm[]
+  bonus: number
+}
+
+type RolledDiceExpression = ParsedDiceExpression & {
+  rolls: Array<DiceTerm & { values: number[], total: number }>
+  total: number
+}
+
+const parseDiceExpression = (expression?: string): ParsedDiceExpression => {
+  const text = String(expression || '')
+  const diceTerms = Array.from(text.matchAll(/(\d*)d(\d+)/gi)).map((match) => ({
+    count: Number(match[1] || 1),
+    sides: Number(match[2]),
+  })).filter((term) => term.count > 0 && term.sides > 0)
+  const staticText = text.replace(/\d*d\d+/gi, '')
+  const bonus = Array.from(staticText.matchAll(/[+-]\s*\d+/g)).reduce((total, match) => (
+    total + Number(match[0].replace(/\s+/g, ''))
+  ), 0)
+  return { diceTerms, bonus }
+}
+
+const rollDice = async (count: number, sides: number) => {
+  const response = await fetch(`${API_BASE}/api/dice/roll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dice_type: `d${sides}`, num_rolls: count }),
+  })
+  const data = await response.json()
+  if (!response.ok || data.error) {
+    throw new Error(data.detail || data.error || 'Roll failed')
+  }
+  const values = Array.isArray(data.rolls) ? data.rolls.map((value: unknown) => Number(value) || 0) : []
+  return {
+    values,
+    total: Number(data.total) || values.reduce((sum: number, value: number) => sum + value, 0),
+  }
+}
+
+const rollDiceExpression = async (expression?: string): Promise<RolledDiceExpression> => {
+  const parsed = parseDiceExpression(expression)
+  const rolls = await Promise.all(parsed.diceTerms.map(async (term) => {
+    const roll = await rollDice(term.count, term.sides)
+    return { ...term, ...roll }
+  }))
+  return {
+    ...parsed,
+    rolls,
+    total: rolls.reduce((sum, roll) => sum + roll.total, 0) + parsed.bonus,
+  }
+}
+
+const formatDiceRoll = (roll: RolledDiceExpression) => {
+  const diceParts = roll.rolls.map((item) => (
+    `${item.count}d${item.sides}(${item.values.join(', ')})`
+  ))
+  const bonusPart = roll.bonus ? formatBonus(roll.bonus) : ''
+  return [...diceParts, bonusPart].filter(Boolean).join(' ')
+}
+
+const buildCombatRollMessage = async (
+  character: DndCharacter,
+  option: CombatOption,
+  selectedWeaponNames: string[],
+) => {
+  const actorName = character.basic?.characterName || 'Character'
+  const targetName = selectedWeaponNames.length ? ` with ${selectedWeaponNames.join(', ')}` : ''
+  const parts: string[] = [`${actorName} uses ${option.name}${targetName}.`]
+
+  if (option.attackBonus !== undefined) {
+    const attackRoll = await rollDiceExpression('1d20')
+    const attackTotal = attackRoll.total + Number(option.attackBonus || 0)
+    parts.push(`Attack: ${formatDiceRoll(attackRoll)} ${formatBonus(option.attackBonus)} = ${attackTotal}`)
+  }
+
+  if (option.damage) {
+    const damageRoll = await rollDiceExpression(option.damage)
+    if (damageRoll.rolls.length > 0) {
+      const damageType = option.damageType ? ` ${option.damageType}` : ''
+      parts.push(`Damage: ${formatDiceRoll(damageRoll)} = ${damageRoll.total}${damageType}`)
+    } else {
+      parts.push(`Damage: ${option.damage}${option.damageType && !option.damage.includes(option.damageType) ? ` ${option.damageType}` : ''}`)
+    }
+  }
+
+  if (parts.length === 1) {
+    parts.push(`${TYPE_LABELS[option.type]} option used.`)
+  }
+
+  return parts.join(' | ')
+}
 
 const getTemplatesById = (itemTemplates: ItemTemplate[] = []) => {
   const cached = templateMapCache.get(itemTemplates)
@@ -711,7 +811,7 @@ function CombatAccordionPanel({
   )
 }
 
-export function CombatSection({ character, itemTemplates = [], onChange }: CombatSectionProps) {
+export function CombatSection({ character, itemTemplates = [], onChange, onCombatMessage }: CombatSectionProps) {
   const [editingOption, setEditingOption] = useState<CombatOption | null>(null)
   const [modalActivationType, setModalActivationType] = useState<ActivationType | null>(null)
   const options = useMemo(() => getCombatOptions(character, itemTemplates), [character, itemTemplates])
@@ -726,7 +826,7 @@ export function CombatSection({ character, itemTemplates = [], onChange }: Comba
     setModalActivationType(null)
   }
 
-  const useOption = (option: CombatOption) => {
+  const useOption = async (option: CombatOption) => {
     const weaponNames = getEquippedWeapons(character, itemTemplates)
       .filter((weapon) => option.selectedWeaponIds?.includes(weapon.id))
       .map((weapon) => getWeaponName(weapon, itemTemplates))
@@ -749,6 +849,13 @@ export function CombatSection({ character, itemTemplates = [], onChange }: Comba
       customCombatOptions,
       combatLog: [...(character.combatLog || []), logEntry],
     })
+    if (!onCombatMessage) return
+    try {
+      onCombatMessage(await buildCombatRollMessage(character, option, weaponNames))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Roll failed'
+      onCombatMessage(`Combat roll error: ${message}`)
+    }
   }
 
   return (

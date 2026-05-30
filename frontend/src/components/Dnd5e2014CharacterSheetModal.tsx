@@ -477,7 +477,7 @@ function DynamicRows({ title, rows, createRow, onChange, renderRow }) {
  *
  * @param {Dnd5e2014CharacterSheetModalProps} props
  */
-function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCancel, onRollSkill, onRollDeathSave, campaignId, characterId }: any) {
+function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCancel, onRollSkill, onRollDeathSave, onCombatMessage, campaignId, characterId }: any) {
   const [activeTab, setActiveTab] = useState('basic')
   const [character, setCharacter] = useState(() => mergeCharacter(initialCharacter))
   const [errors, setErrors] = useState([])
@@ -902,6 +902,7 @@ function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCanc
         character={character}
         itemTemplates={itemTemplates}
         onChange={setCharacter}
+        onCombatMessage={onCombatMessage}
       />
     </div>
   )
