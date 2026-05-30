@@ -403,6 +403,14 @@ function CharacterSheet({ activeCampaign, onAuthRequired, setMessages }) {
     }
   }
 
+  const addCombatMessage = (combatMessage) => {
+    if (setMessages) {
+      setMessages((prev) => [...prev, combatMessage])
+    } else {
+      setMessage(combatMessage)
+    }
+  }
+
   const openEditModal = (character) => {
     setSelectedId(character.id)
     setEditingCharacter(character)
@@ -902,6 +910,7 @@ function CharacterSheet({ activeCampaign, onAuthRequired, setMessages }) {
             onSave={saveDndCharacter}
             onRollSkill={rollDndSkill}
             onRollDeathSave={rollDndDeathSave}
+            onCombatMessage={addCombatMessage}
             campaignId={activeCampaign?.id}
             characterId={editingCharacter?.id}
           />
