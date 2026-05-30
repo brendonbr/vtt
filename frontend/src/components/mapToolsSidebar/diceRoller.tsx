@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 
 import { Dices } from 'lucide-react'
 import { API_BASE } from '../vtt/vttConfig'
 
-function DiceRoller({ messages, setMessages }) {
+type DiceRollerProps = {
+  messages: string[]
+  setMessages: Dispatch<SetStateAction<string[]>>
+}
+
+function DiceRoller({ setMessages }: DiceRollerProps) {
   const [diceCount, setDiceCount] = useState(1)
   const [diceSides, setDiceSides] = useState(20)
   const [rollMenu, setRollMenu] = useState(false)
@@ -16,8 +21,8 @@ function DiceRoller({ messages, setMessages }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          dice_type: `d${parseInt(diceSides)}`,
-          num_rolls: parseInt(diceCount),
+          dice_type: `d${diceSides}`,
+          num_rolls: diceCount,
         }),
       })
       const data = await response.json()
@@ -29,7 +34,8 @@ function DiceRoller({ messages, setMessages }) {
         setRollMenu(false)
       }
     } catch (error) {
-      setMessages(prev => [...prev, `Error rolling dice: ${error.message}`])
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setMessages(prev => [...prev, `Error rolling dice: ${message}`])
     }
   }
 
@@ -54,7 +60,7 @@ function DiceRoller({ messages, setMessages }) {
                   min="1"
                   max="100"
                   value={diceCount}
-                  onChange={(e) => setDiceCount(e.target.value)}
+                  onChange={(e) => setDiceCount(Math.max(1, Number(e.target.value) || 1))}
                   className="w-full rounded-2xl border border-[#444] bg-background px-4 py-3 text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
                 />
               </label>
@@ -66,7 +72,7 @@ function DiceRoller({ messages, setMessages }) {
                   min="2"
                   max="1000"
                   value={diceSides}
-                  onChange={(e) => setDiceSides(e.target.value)}
+                  onChange={(e) => setDiceSides(Math.max(2, Number(e.target.value) || 2))}
                   className="w-full rounded-2xl border border-[#444] bg-background px-4 py-3 text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
                 />
               </label>

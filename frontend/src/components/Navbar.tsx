@@ -88,7 +88,10 @@ function Navbar({ currentUser, onLogin, onLogout, messages, setMessages }) {
         ) : (
           <>
             <button
-              onClick={() => setShowRegisterForm(!showRegisterForm) && setShowLoginForm(showLoginForm)}
+              onClick={() => {
+                setShowRegisterForm((open) => !open)
+                setShowLoginForm(false)
+              }}
               style={{
                 backgroundColor: 'var(--accent-color)',
                 color: '#1a1a1a',
@@ -103,7 +106,10 @@ function Navbar({ currentUser, onLogin, onLogout, messages, setMessages }) {
               Register
             </button>
             <button
-              onClick={() => setShowLoginForm(!showLoginForm) && setShowRegisterForm(showRegisterForm)}
+              onClick={() => {
+                setShowLoginForm((open) => !open)
+                setShowRegisterForm(false)
+              }}
               style={{
                 backgroundColor: 'var(--secondary-color)',
                 color: 'var(--text-color)',

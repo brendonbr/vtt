@@ -1,7 +1,49 @@
 import { ImagePlus, LogOut, Play, Plus, Settings, Trash2, Users } from 'lucide-react'
+import type { ChangeEvent } from 'react'
 import { useState } from 'react'
 import { API_BASE } from './vttConfig'
 const GAME_SYSTEM_OPTIONS = ['Dnd5e 2014', 'Tormenta20']
+
+type CampaignId = string | number
+
+type CampaignForm = {
+  name: string
+  description: string
+  game_system: string
+  setting: string
+  status?: string
+  party_notes?: string
+  gm_notes?: string
+}
+
+type Campaign = CampaignForm & {
+  id: CampaignId
+  owner_id: CampaignId
+  thumbnail?: string | null
+}
+
+type CampaignsPageProps = {
+  campaigns: Campaign[]
+  currentUser: {
+    id: CampaignId
+    nickname: string
+  }
+  message?: string
+  onCreate: (form: CampaignForm) => void
+  onDelete: (campaignId: CampaignId) => void
+  onJoin: (campaignId: string) => void
+  onLogout: () => void
+  onStart: (campaign: Campaign) => void
+  onThumbnailUpload: (campaignId: CampaignId, event: ChangeEvent<HTMLInputElement>) => void
+  onUpdate: (campaignId: CampaignId, form: CampaignForm) => void
+}
+
+const emptyCampaignForm = (): CampaignForm => ({
+  name: '',
+  description: '',
+  game_system: GAME_SYSTEM_OPTIONS[0],
+  setting: '',
+})
 
 function CampaignsPage({
   campaigns,
@@ -14,24 +56,19 @@ function CampaignsPage({
   onStart,
   onThumbnailUpload,
   onUpdate,
-}) {
-  const [createForm, setCreateForm] = useState({
-    name: '',
-    description: '',
-    game_system: GAME_SYSTEM_OPTIONS[0],
-    setting: '',
-  })
+}: CampaignsPageProps) {
+  const [createForm, setCreateForm] = useState<CampaignForm>(emptyCampaignForm)
   const [joinId, setJoinId] = useState('')
-  const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState({})
+  const [editingId, setEditingId] = useState<CampaignId | null>(null)
+  const [editForm, setEditForm] = useState<CampaignForm>(emptyCampaignForm)
 
   const submitCreate = () => {
     if (!createForm.name.trim()) return
     onCreate(createForm)
-    setCreateForm({ name: '', description: '', game_system: GAME_SYSTEM_OPTIONS[0], setting: '' })
+    setCreateForm(emptyCampaignForm())
   }
 
-  const startEditing = (campaign) => {
+  const startEditing = (campaign: Campaign) => {
     setEditingId(campaign.id)
     setEditForm({
       name: campaign.name,
@@ -45,9 +82,10 @@ function CampaignsPage({
   }
 
   const submitEdit = () => {
+    if (editingId === null) return
     onUpdate(editingId, editForm)
     setEditingId(null)
-    setEditForm({})
+    setEditForm(emptyCampaignForm())
   }
 
   return (

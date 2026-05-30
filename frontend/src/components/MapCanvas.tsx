@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from './vtt/vttConfig'
 const DEFAULT_MAP_SIZE = { width: 800, height: 600 }
 
-function MapCanvas({ campaignId, distanceUnit = 'ft', gridColor = '#ffffff', gridEnabled = true, gridSize = 50, onWorldSizeChange = () => {}, pan = { x: 0, y: 0 }, selectedMap, setPan, setZoom = () => {}, shapes = [], setShapes, tool, zoom = 1 }) {
+function MapCanvas({ campaignId, distanceUnit = 'ft', gridColor = '#ffffff', gridEnabled = true, gridSize = 50, onWorldSizeChange = () => {}, pan = { x: 0, y: 0 }, selectedMap, setPan, setZoom = () => {}, shapes = [], setShapes, tool, zoom = 1 }: any) {
   const canvasRef = useRef(null)
   const imageCacheRef = useRef(new Map())
   const imageRef = useRef(null)
