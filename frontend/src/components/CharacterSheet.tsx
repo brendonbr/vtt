@@ -97,13 +97,13 @@ const parseSpells = (value) => {
 
 const dndModalCharacterToPayload = (character, campaignId) => {
   const savingThrowProficiencies = Object.entries(character.abilities)
-    .filter(([, ability]) => ability.saveProficient)
+    .filter(([, ability]: [string, any]) => ability.saveProficient)
     .map(([abilityId]) => abilityId)
   const skillProficiencies = Object.entries(character.skills)
-    .filter(([, skill]) => skill.proficient)
+    .filter(([, skill]: [string, any]) => skill.proficient)
     .map(([skillId]) => skillId)
   const skillExpertise = Object.entries(character.skills)
-    .filter(([, skill]) => skill.expertise)
+    .filter(([, skill]: [string, any]) => skill.expertise)
     .map(([skillId]) => skillId)
   const featureGroups = Object.values(character.features).flat()
   const notes = [
@@ -570,7 +570,7 @@ function CharacterSheet({ activeCampaign, onAuthRequired, setMessages }) {
     }
   }
 
-  const saveDndCharacter = async (character, options = {}) => {
+  const saveDndCharacter = async (character, options: { autoSave?: boolean } = {}) => {
     if (!activeCampaign?.id) return
 
     try {

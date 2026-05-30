@@ -1,4 +1,5 @@
 import { Eye, Upload, X } from 'lucide-react'
+import type { ChangeEvent } from 'react'
 
 const ACCEPTED_MEDIA_TYPES = [
   'image/png',
@@ -15,7 +16,7 @@ const ACCEPTED_MEDIA_TYPES = [
   'application/pdf',
 ]
 
-export function mediaKind(type) {
+export function mediaKind(type: string) {
   if (type.startsWith('image/')) return 'image'
   if (type.startsWith('video/')) return 'video'
   if (type.startsWith('audio/')) return 'audio'
@@ -23,11 +24,11 @@ export function mediaKind(type) {
   return 'file'
 }
 
-function MediaPanel({ activeCampaign, currentUser, mediaItems, onDisplayMedia, onRemoveMedia, onUploadMedia, setMessages }) {
+function MediaPanel({ activeCampaign, currentUser, mediaItems, onDisplayMedia, onRemoveMedia, onUploadMedia, setMessages }: any) {
   const isDm = Boolean(currentUser?.id && activeCampaign?.owner_id === currentUser.id)
 
-  const uploadMedia = (event) => {
-    const files = Array.from(event.target.files || [])
+  const uploadMedia = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []) as File[]
     const validFiles = files.filter((file) => ACCEPTED_MEDIA_TYPES.includes(file.type))
     const invalidCount = files.length - validFiles.length
 

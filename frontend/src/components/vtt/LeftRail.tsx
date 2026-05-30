@@ -1,13 +1,10 @@
 import {
   Dices,
   Hand,
-  Lock,
   MousePointer2,
   PenLine,
   Ruler,
-  Shield,
-  Sparkles,
-  Swords,
+
   Trash2,
 } from 'lucide-react'
 import DiceRoller from '../mapToolsSidebar/diceRoller'

@@ -365,7 +365,7 @@ const mergeCharacter = (initialCharacter) => ({
   spellCombatLog: initialCharacter?.spellCombatLog || [],
 })
 
-function Field({ label, children }) {
+function Field({ label, children }: any) {
   return (
     <label className="dnd-modal-field">
       <span>{label}</span>
@@ -374,7 +374,7 @@ function Field({ label, children }) {
   )
 }
 
-function TextInput({ label, value, onChange, type = 'text', min, max, required = false }) {
+function TextInput({ label, value, onChange, type = 'text', min, max, required = false }: any) {
   return (
     <Field label={label}>
       <input
@@ -389,7 +389,7 @@ function TextInput({ label, value, onChange, type = 'text', min, max, required =
   )
 }
 
-function TextArea({ label, value, onChange, rows = 4 }) {
+function TextArea({ label, value, onChange, rows = 4 }: any) {
   return (
     <Field label={label}>
       <textarea rows={rows} value={value} onChange={(event) => onChange(event.target.value)} />
@@ -397,7 +397,7 @@ function TextArea({ label, value, onChange, rows = 4 }) {
   )
 }
 
-function CheckboxField({ label, checked, onChange }) {
+function CheckboxField({ label, checked, onChange }: any) {
   return (
     <label className="dnd-modal-checkbox">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
@@ -406,7 +406,7 @@ function CheckboxField({ label, checked, onChange }) {
   )
 }
 
-function SelectInput({ label, value, onChange, options }) {
+function SelectInput({ label, value, onChange, options }: any) {
   return (
     <Field label={label}>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
@@ -418,7 +418,7 @@ function SelectInput({ label, value, onChange, options }) {
   )
 }
 
-function CheckboxDropdown({ label, summary, children }) {
+function CheckboxDropdown({ label, summary, children }: any) {
   return (
     <details className="dnd-checkbox-dropdown">
       <summary>
@@ -477,7 +477,7 @@ function DynamicRows({ title, rows, createRow, onChange, renderRow }) {
  *
  * @param {Dnd5e2014CharacterSheetModalProps} props
  */
-function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCancel, onRollSkill, onRollDeathSave, campaignId, characterId }) {
+function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCancel, onRollSkill, onRollDeathSave, campaignId, characterId }: any) {
   const [activeTab, setActiveTab] = useState('basic')
   const [character, setCharacter] = useState(() => mergeCharacter(initialCharacter))
   const [errors, setErrors] = useState([])
@@ -548,7 +548,7 @@ function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCanc
   const proficiencyBonus = useMemo(() => proficiencyBonusByLevel(character.basic.level), [character.basic.level])
 
   const computed = useMemo(() => {
-    const skillTotals = {}
+    const skillTotals: Record<string, number> = {}
     SKILLS.forEach((skill) => {
       skillTotals[skill.id] = skillTotal(
         character.skills[skill.id],
