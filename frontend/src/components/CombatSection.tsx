@@ -59,6 +59,8 @@ export interface EquipmentItem {
     proficient?: boolean
     actionType?: ActivationType
     miscBonus?: number
+    ammunitionItemId?: string
+    ammunitionPerAttack?: number
   }
   actionData?: ItemActionData
 }
@@ -77,6 +79,7 @@ export interface ItemTemplate {
   properties?: string[]
   modifiers?: Array<{ target: string, value: number | string }>
   range?: string
+  ammunition?: string
   actionData?: ItemActionData
 }
 
@@ -328,6 +331,16 @@ const getItemType = (item: EquipmentItem, itemTemplates: ItemTemplate[] = []) =>
   item.itemType || item.type || getItemTemplate(item, itemTemplates)?.type || ''
 )
 
+const getItemName = (item: EquipmentItem, itemTemplates: ItemTemplate[] = []) => (
+  item.name || getItemTemplate(item, itemTemplates)?.name || 'Item'
+)
+
+const weaponUsesAmmunition = (weapon: EquipmentItem, itemTemplates: ItemTemplate[] = []) => {
+  const template = getItemTemplate(weapon, itemTemplates)
+  const properties = (weapon.weaponData?.properties || template?.properties || []).map((property) => normalizeText(property))
+  return properties.includes('ammunition')
+}
+
 const getWeaponDamageType = (item: EquipmentItem, itemTemplates: ItemTemplate[] = []) => {
   const template = getItemTemplate(item, itemTemplates)
   const templateTypes = template?.damage?.types
@@ -401,10 +414,6 @@ const featureSourceFromCategory = (category: string) => {
   return 'other'
 }
 
-const spellIsCombatReady = (spell: CharacterSpell) => (
-  Number(spell.level) === 0 || spell.prepared || spell.known
-)
-
 export function getCombatOptions(character: DndCharacter, itemTemplates: ItemTemplate[] = []): CombatOption[] {
   const equippedWeapons = getEquippedWeapons(character, itemTemplates)
   const weaponAttacks = equippedWeapons.map((weapon): CombatOption => ({
@@ -451,8 +460,7 @@ export function getCombatOptions(character: DndCharacter, itemTemplates: ItemTem
       ? spell.activationType as ActivationType
       : null
     const activationType = explicitActivation || getActivationTypeFromSpell(spell)
-    const isReady = spellIsCombatReady(spell) || character.spellcasting?.spellcastingMode === 'custom'
-    if (!activationType || !isReady || !spell.name) return []
+    if (!activationType || !spell.name) return []
     return [{
       id: `spell-${spell.id || index}`,
       name: spell.name,
@@ -591,8 +599,24 @@ function CombatOptionCard({
   const selectedWeaponNames = getEquippedWeapons(character, itemTemplates)
     .filter((weapon) => option.selectedWeaponIds?.includes(weapon.id))
     .map((weapon) => getWeaponName(weapon, itemTemplates))
+  const selectedWeapons = getEquippedWeapons(character, itemTemplates)
+    .filter((weapon) => option.selectedWeaponIds?.includes(weapon.id))
+  const ammunitionRows = selectedWeapons
+    .filter((weapon) => weaponUsesAmmunition(weapon, itemTemplates))
+    .map((weapon) => {
+      const quantity = Math.max(1, Number(weapon.weaponData?.ammunitionPerAttack) || 1)
+      const ammunition = character.equipment?.items?.find((item) => item.id === weapon.weaponData?.ammunitionItemId)
+      return {
+        weapon,
+        ammunition,
+        quantity,
+        available: Number(ammunition?.quantity) || 0,
+      }
+    })
   const hasUses = option.usesRemaining !== undefined
-  const useDisabled = hasUses && Number(option.usesRemaining) <= 0
+  const hasMissingAmmunition = ammunitionRows.some((row) => !row.ammunition)
+  const hasInsufficientAmmunition = ammunitionRows.some((row) => row.ammunition && row.available < row.quantity)
+  const useDisabled = (hasUses && Number(option.usesRemaining) <= 0) || hasMissingAmmunition || hasInsufficientAmmunition
 
   return (
     <article className="combat-option-card">
@@ -620,6 +644,18 @@ function CombatOptionCard({
         <div className="combat-selected-weapons">
           <span>Weapons</span>
           <strong>{selectedWeaponNames.join(', ')}</strong>
+        </div>
+      )}
+      {ammunitionRows.length > 0 && (
+        <div className="combat-selected-weapons">
+          <span>Ammunition</span>
+          <strong>
+            {ammunitionRows.map((row) => (
+              row.ammunition
+                ? `${getItemName(row.ammunition, itemTemplates)} x${row.quantity} (${row.available} left)`
+                : `${getWeaponName(row.weapon, itemTemplates)}: not selected`
+            )).join(', ')}
+          </strong>
         </div>
       )}
 
@@ -827,9 +863,27 @@ export function CombatSection({ character, itemTemplates = [], onChange, onComba
   }
 
   const useOption = async (option: CombatOption) => {
-    const weaponNames = getEquippedWeapons(character, itemTemplates)
+    const selectedWeapons = getEquippedWeapons(character, itemTemplates)
       .filter((weapon) => option.selectedWeaponIds?.includes(weapon.id))
+    const weaponNames = selectedWeapons
       .map((weapon) => getWeaponName(weapon, itemTemplates))
+    const ammunitionSpend = new Map<string, number>()
+    for (const weapon of selectedWeapons) {
+      if (!weaponUsesAmmunition(weapon, itemTemplates)) continue
+      const ammunitionItemId = weapon.weaponData?.ammunitionItemId
+      const quantity = Math.max(1, Number(weapon.weaponData?.ammunitionPerAttack) || 1)
+      const ammunition = character.equipment?.items?.find((item) => item.id === ammunitionItemId)
+      if (!ammunitionItemId || !ammunition) {
+        onCombatMessage?.(`${getWeaponName(weapon, itemTemplates)} needs ammunition selected in Equipment.`)
+        return
+      }
+      const nextRequired = (ammunitionSpend.get(ammunitionItemId) || 0) + quantity
+      if ((Number(ammunition.quantity) || 0) < nextRequired) {
+        onCombatMessage?.(`Not enough ${getItemName(ammunition, itemTemplates)} for ${getWeaponName(weapon, itemTemplates)}.`)
+        return
+      }
+      ammunitionSpend.set(ammunitionItemId, nextRequired)
+    }
     const customCombatOptions = (character.customCombatOptions || []).map((item) => (
       item.id === option.id && item.usesRemaining !== undefined
         ? { ...item, usesRemaining: Math.max(0, Number(item.usesRemaining) - 1) }
@@ -844,9 +898,17 @@ export function CombatSection({ character, itemTemplates = [], onChange, onComba
       timestamp: new Date().toISOString(),
       selectedWeaponNames: weaponNames,
     }
+    const equipmentItems = (character.equipment?.items || []).map((item) => {
+      const spent = ammunitionSpend.get(item.id) || 0
+      return spent > 0 ? { ...item, quantity: Math.max(0, (Number(item.quantity) || 0) - spent) } : item
+    })
     onChange({
       ...character,
       customCombatOptions,
+      equipment: {
+        ...character.equipment,
+        items: equipmentItems,
+      },
       combatLog: [...(character.combatLog || []), logEntry],
     })
     if (!onCombatMessage) return

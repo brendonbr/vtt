@@ -3789,6 +3789,79 @@ button.map-row {
   padding: 0 8px;
 }
 
+.dnd-slot-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.dnd-slot-picker summary {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text-color);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.dnd-slot-picker summary::-webkit-details-marker {
+  display: none;
+}
+
+.dnd-slot-picker summary strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.dnd-slot-picker-menu {
+  position: absolute;
+  z-index: 25;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: min(360px, calc(100vw - 40px));
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #17181f;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dnd-slot-picker-menu button {
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-color);
+  padding: 0 9px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-align: left;
+}
+
+.dnd-slot-picker-menu button:hover,
+.dnd-slot-picker-menu button.active {
+  border-color: rgba(216, 180, 95, 0.5);
+  background: rgba(216, 180, 95, 0.14);
+  color: #f7df99;
+}
+
 .dnd-custom-item-save {
   min-height: 40px;
   border: 1px solid rgba(216, 180, 95, 0.48);
@@ -3983,6 +4056,78 @@ button.map-row {
 .dnd-equipment-equipped input:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.dnd-slot-picker summary,
+.dnd-slot-picker-menu button,
+.dnd-equipment-card,
+.dnd-equipment-equipped,
+.dnd-equipment-item-name,
+.dnd-item-tags span,
+.spell-card,
+.spell-badges span,
+.spell-card-stats span,
+.spell-check-field,
+.combat-option-card,
+.combat-option-badges span,
+.combat-option-stats span,
+.combat-selected-weapons {
+  @apply transition-colors duration-200 ease-out;
+}
+
+.spell-section-heading button,
+.spell-level-group summary button,
+.spell-card footer button,
+.spell-form-modal button,
+.combat-option-card footer button,
+.combat-accordion-panel summary button,
+.dnd-equipment-section-heading button,
+.dnd-equipment-inventory-actions button,
+.dnd-equipment-card-head button,
+.dnd-custom-item-save,
+.dnd-custom-item-list button {
+  @apply transition-colors duration-200 ease-out;
+}
+
+.spell-settings-grid input,
+.spell-settings-grid select,
+.spell-settings-grid textarea,
+.spell-pact-grid input,
+.spell-pact-grid select,
+.spell-filters input,
+.spell-filters select,
+.spell-form-grid input,
+.spell-form-grid select,
+.spell-form-grid textarea,
+.combat-form-grid input,
+.combat-form-grid select,
+.combat-form-grid textarea,
+.combat-weapon-select summary,
+.dnd-modal-field input,
+.dnd-modal-field select,
+.dnd-modal-field textarea,
+.dnd-equipment-add-select select {
+  @apply transition-colors duration-200 ease-out;
+}
+
+.spell-settings-grid input:focus,
+.spell-settings-grid select:focus,
+.spell-settings-grid textarea:focus,
+.spell-pact-grid input:focus,
+.spell-pact-grid select:focus,
+.spell-filters input:focus,
+.spell-filters select:focus,
+.spell-form-grid input:focus,
+.spell-form-grid select:focus,
+.spell-form-grid textarea:focus,
+.combat-form-grid input:focus,
+.combat-form-grid select:focus,
+.combat-form-grid textarea:focus,
+.dnd-modal-field input:focus,
+.dnd-modal-field select:focus,
+.dnd-modal-field textarea:focus,
+.dnd-equipment-add-select select:focus {
+  @apply border-accent ring-2 ring-accent/30;
 }
 
 .dnd-item-template-details {

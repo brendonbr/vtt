@@ -1,6 +1,5 @@
 export const EQUIPMENT_SLOTS = [
-  { value: 'mainHand', label: 'Main Hand' },
-  { value: 'offHand', label: 'Off Hand' },
+  { value: 'weapon', label: 'Weapon' },
   { value: 'armor', label: 'Armor' },
   { value: 'shield', label: 'Shield' },
   { value: 'helmet', label: 'Helmet' },
@@ -11,6 +10,7 @@ export const EQUIPMENT_SLOTS = [
   { value: 'ring2', label: 'Ring 2' },
   { value: 'amulet', label: 'Amulet' },
   { value: 'belt', label: 'Belt' },
+  { value: 'gear', label: 'Gear' },
   { value: 'consumable', label: 'Consumable' },
   { value: 'ammunition', label: 'Ammunition' },
 ]
@@ -39,7 +39,7 @@ export const ITEM_TEMPLATES = [
     weight: 3,
     cost: '15 gp',
     attunement: false,
-    slot: 'mainHand',
+    slot: 'weapon',
     range: '5 ft.',
     ammunition: '',
   },
@@ -59,7 +59,7 @@ export const ITEM_TEMPLATES = [
     weight: 3,
     cost: '',
     attunement: false,
-    slot: 'mainHand',
+    slot: 'weapon',
     range: '5 ft.',
     ammunition: '',
   },
@@ -76,7 +76,7 @@ export const ITEM_TEMPLATES = [
     weight: 2,
     cost: '25 gp',
     attunement: false,
-    slot: 'mainHand',
+    slot: 'weapon',
     range: '80/320 ft.',
     ammunition: 'Arrows',
   },
@@ -259,7 +259,14 @@ export const defaultSlotForType = (type) => {
   if (type === 'shield') return 'shield'
   if (type === 'ammunition') return 'ammunition'
   if (type === 'consumable') return 'consumable'
-  return 'mainHand'
+  if (['gear', 'magic', 'magicalItem', 'accessory'].includes(type)) return 'gear'
+  return 'weapon'
+}
+
+const normalizeSlot = (slot, type) => {
+  if (slot === 'mainHand' || slot === 'offHand') return 'weapon'
+  if (slot === 'carried') return 'gear'
+  return slot || defaultSlotForType(type)
 }
 
 export const createInventoryItem = (templateId = ITEM_TEMPLATES[0].id, templates = ITEM_TEMPLATES) => {
@@ -271,7 +278,7 @@ export const createInventoryItem = (templateId = ITEM_TEMPLATES[0].id, templates
     itemTemplateId: template.id,
     quantity: 1,
     equipped: false,
-    slot: template.slot || 'mainHand',
+    slot: normalizeSlot(template.slot, template.type),
     attuned: false,
   }
 }
@@ -285,7 +292,7 @@ export const normalizeInventoryItem = (item, templates = ITEM_TEMPLATES) => {
       ...createInventoryItem(template.id, templates),
       ...item,
       quantity: Math.max(0, Number(item.quantity) || 0),
-      slot: item.slot || template.slot || 'mainHand',
+      slot: normalizeSlot(item.slot || template.slot, template.type),
       attuned: Boolean(item.attuned),
       equipped: Boolean(item.equipped),
     }
