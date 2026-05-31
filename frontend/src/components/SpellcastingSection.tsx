@@ -121,6 +121,20 @@ const ACTIVATION_LABELS: Record<ActivationType, string> = {
 const SPELL_LEVELS = Array.from({ length: 10 }, (_, level) => level)
 const SLOT_LEVELS = Array.from({ length: 9 }, (_, index) => index + 1)
 const SPELL_SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment', 'Evocation', 'Illusion', 'Necromancy', 'Transmutation']
+const CASTING_TIME_OPTIONS = [
+  { value: '', label: 'Select casting time' },
+  { value: '1 action', label: '1 Action' },
+  { value: '1 bonus action', label: '1 Bonus Action' },
+  { value: '1 reaction', label: '1 Reaction' },
+  { value: '1 minute', label: '1 Minute' },
+  { value: '10 minutes', label: '10 Minutes' },
+  { value: '1 hour', label: '1 Hour' },
+  { value: '8 hours', label: '8 Hours' },
+  { value: '12 hours', label: '12 Hours' },
+  { value: '24 hours', label: '24 Hours' },
+  { value: 'custom', label: 'Custom' },
+]
+const COMBAT_ACTIVATION_TYPES: ActivationType[] = ['action', 'bonusAction', 'reaction']
 
 const randomId = () => crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
 const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, Number(value) || 0))
@@ -197,6 +211,17 @@ export function getActivationTypeFromCastingTime(castingTime: string): Activatio
   return 'other'
 }
 
+const getCombatActivationType = (spell: Partial<CharacterSpell>): ActivationType => (
+  COMBAT_ACTIVATION_TYPES.includes(spell.activationType as ActivationType)
+    ? spell.activationType as ActivationType
+    : getActivationTypeFromCastingTime(spell.castingTime || '')
+)
+
+const getCastingTimeSelectValue = (castingTime: string) => {
+  const value = String(castingTime || '')
+  return CASTING_TIME_OPTIONS.some((option) => option.value === value) ? value : 'custom'
+}
+
 export function getRemainingSpellSlots(character: SpellCharacter, spellLevel: number): number {
   const slot = (character.spellSlots || []).find((item) => item.level === spellLevel)
   if (!slot) return 0
@@ -258,7 +283,7 @@ export function castSpell(character: SpellCharacter, spellId: string, slotLevelU
 
 export function getSpellsForCombat(character: SpellCharacter, activationType: ActivationType): CharacterSpell[] {
   return (character.spells || []).filter((spell) => {
-    const spellActivation = spell.activationType || getActivationTypeFromCastingTime(spell.castingTime)
+    const spellActivation = getCombatActivationType(spell)
     if (spellActivation !== activationType) return false
     return spell.level === 0
       || spell.prepared
@@ -294,7 +319,7 @@ export function normalizeSpellcastingCharacter(character: SpellCharacter): Spell
     ...spell,
     id: spell.id || `spell-${index}-${String(spell.name || 'new').toLowerCase().replace(/\s+/g, '-')}`,
     level: clampNumber(Number(spell.level) || 0, 0, 9),
-    activationType: spell.activationType || getActivationTypeFromCastingTime(spell.castingTime || ''),
+    activationType: getCombatActivationType(spell),
     concentration: Boolean(spell.concentration),
     ritual: Boolean(spell.ritual),
     prepared: Boolean(spell.prepared || Number(spell.level) === 0),
@@ -449,7 +474,7 @@ function SpellCard({ character, spell, onCast, onEdit, onDelete, onTogglePrepare
           <span>{spellLevelLabel(spell.level)} {spell.school ? `• ${spell.school}` : ''}</span>
         </div>
         <div className="spell-badges">
-          <span>{ACTIVATION_LABELS[spell.activationType || getActivationTypeFromCastingTime(spell.castingTime)]}</span>
+          <span>{ACTIVATION_LABELS[getCombatActivationType(spell)]}</span>
           {spell.concentration && <span>Concentration</span>}
           {spell.ritual && <span>Ritual</span>}
           {spell.prepared && <span>Prepared</span>}
@@ -489,7 +514,14 @@ function SpellFormModal({ initialSpell, level, onSave, onCancel }: {
   onCancel: () => void
 }) {
   const [form, setForm] = useState<CharacterSpell>(() => initialSpell || createEmptySpell(level))
+  const [castingTimeMode, setCastingTimeMode] = useState(() => getCastingTimeSelectValue(initialSpell?.castingTime || ''))
   const patch = (updates: Partial<CharacterSpell>) => setForm((prev) => ({ ...prev, ...updates }))
+  const updateCastingTime = (castingTime: string) => {
+    patch({
+      castingTime,
+      activationType: getActivationTypeFromCastingTime(castingTime),
+    })
+  }
 
   return (
     <div className="spell-modal-backdrop" role="presentation">
@@ -499,7 +531,28 @@ function SpellFormModal({ initialSpell, level, onSave, onCancel }: {
           <label><span>Name</span><input value={form.name} placeholder="Fire spell" onChange={(event) => patch({ name: event.target.value })} /></label>
           <label><span>Level</span><input type="number" min="0" max="9" value={form.level} onChange={(event) => patch({ level: clampNumber(Number(event.target.value), 0, 9) })} /></label>
           <label><span>School</span><input value={form.school || ''} onChange={(event) => patch({ school: event.target.value })} /></label>
-          <label><span>Casting Time</span><input value={form.castingTime} onChange={(event) => patch({ castingTime: event.target.value, activationType: getActivationTypeFromCastingTime(event.target.value) })} /></label>
+          <label>
+            <span>Casting Time</span>
+            <select
+              value={castingTimeMode}
+              onChange={(event) => {
+                setCastingTimeMode(event.target.value)
+                if (event.target.value === 'custom') {
+                  if (getCastingTimeSelectValue(form.castingTime) !== 'custom') updateCastingTime('')
+                  return
+                }
+                updateCastingTime(event.target.value)
+              }}
+            >
+              {CASTING_TIME_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          {castingTimeMode === 'custom' && (
+            <label>
+              <span>Custom Casting Time</span>
+              <input value={form.castingTime} onChange={(event) => updateCastingTime(event.target.value)} />
+            </label>
+          )}
           <label><span>Range</span><input value={form.range || ''} onChange={(event) => patch({ range: event.target.value })} /></label>
           <label><span>Components</span><input value={form.components || ''} onChange={(event) => patch({ components: event.target.value })} /></label>
           <label><span>Duration</span><input value={form.duration || ''} onChange={(event) => patch({ duration: event.target.value })} /></label>
@@ -517,7 +570,7 @@ function SpellFormModal({ initialSpell, level, onSave, onCancel }: {
           <label className="spell-wide-field"><span>Description</span><textarea rows={4} placeholder="Protective spell" value={form.description || ''} onChange={(event) => patch({ description: event.target.value })} /></label>
           <label className="spell-wide-field"><span>Notes</span><textarea rows={3} value={form.notes || ''} onChange={(event) => patch({ notes: event.target.value })} /></label>
         </div>
-        <footer><button type="button" onClick={onCancel}>Cancel</button><button type="button" disabled={!form.name.trim()} onClick={() => onSave({ ...form, activationType: form.activationType || getActivationTypeFromCastingTime(form.castingTime) })}>Save Spell</button></footer>
+        <footer><button type="button" onClick={onCancel}>Cancel</button><button type="button" disabled={!form.name.trim()} onClick={() => onSave({ ...form, activationType: getCombatActivationType(form) })}>Save Spell</button></footer>
       </section>
     </div>
   )

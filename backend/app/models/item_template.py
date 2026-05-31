@@ -26,6 +26,7 @@ DAMAGE_TYPES = {
     "Thunder",
 }
 EQUIPMENT_SLOTS = {
+    "weapon",
     "mainHand",
     "offHand",
     "armor",
@@ -38,6 +39,7 @@ EQUIPMENT_SLOTS = {
     "ring2",
     "amulet",
     "belt",
+    "gear",
     "ammunition",
     "consumable",
 }

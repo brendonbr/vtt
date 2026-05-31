@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.data.dnd5e_2014_items import EXCLUSIVE_SLOTS, ITEM_TEMPLATES
+from app.data.dnd5e_2014_items import ITEM_TEMPLATES
 from app.models.campaign import AdventureCampaign
 from app.models.character import (
     Dnd5e2014CharacterSheet,
@@ -23,6 +23,9 @@ from app.routers.campaigns import get_campaign_or_404, require_campaign_access, 
 from app.routers.users import get_current_user, get_db
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
+
+LEGACY_WEAPON_SLOTS = {"mainHand", "offHand"}
+LEGACY_GEAR_SLOTS = {"carried"}
 
 CharacterModel = Dnd5e2014CharacterSheet | Tormenta20CharacterSheet
 CharacterResponse = Dnd5e2014CharacterSheetResponse | Tormenta20CharacterSheetResponse
@@ -119,6 +122,14 @@ def model_values(character_data: dict[str, Any], model, schema) -> dict[str, Any
     return {field: value for field, value in validated_data.items() if field in model_fields}
 
 
+def normalize_equipment_slot(slot: Optional[str]) -> Optional[str]:
+    if slot in LEGACY_WEAPON_SLOTS:
+        return "weapon"
+    if slot in LEGACY_GEAR_SLOTS:
+        return "gear"
+    return slot
+
+
 def resolve_item_template(template_id: str, db: Session, user_id: int, campaign_id: Optional[int], character_id: Optional[int] = None):
     if template_id in ITEM_TEMPLATES:
         return ITEM_TEMPLATES[template_id]
@@ -141,9 +152,20 @@ def resolve_item_template(template_id: str, db: Session, user_id: int, campaign_
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Item template access denied")
     if custom.campaign_id is not None and custom.campaign_id != campaign_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Campaign item cannot be equipped outside its campaign")
+    default_slots_by_type = {
+        "weapon": "weapon",
+        "armor": "armor",
+        "shield": "shield",
+        "ammunition": "ammunition",
+        "consumable": "consumable",
+        "gear": "gear",
+        "magic": "gear",
+        "magicalItem": "gear",
+        "accessory": "gear",
+    }
     return {
         "type": custom.type,
-        "slot": (custom.armor_class or {}).get("slot") or "mainHand",
+        "slot": normalize_equipment_slot((custom.armor_class or {}).get("slot")) or default_slots_by_type.get(custom.type, "weapon"),
         "attunement": custom.requires_attunement == "true",
         "properties": custom.properties or [],
         "strengthRequirement": (custom.armor_class or {}).get("strengthRequirement", 0),
@@ -157,7 +179,6 @@ def validate_dnd5e_2014_equipment(values: dict[str, Any], db: Session, user_id: 
     if not isinstance(equipment, list):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Equipment must be a list")
 
-    equipped_slots = {}
     attuned_count = 0
     strength = int(values.get("strength") or 10)
     campaign_id = values.get("campaign_id")
@@ -179,33 +200,20 @@ def validate_dnd5e_2014_equipment(values: dict[str, Any], db: Session, user_id: 
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"{template_id} does not support attunement")
             attuned_count += 1
 
-        if not item.get("equipped"):
-            continue
-
-        slot = item.get("slot") or template.get("slot")
+        slot = normalize_equipment_slot(item.get("slot") or template.get("slot"))
         if slot not in EQUIPMENT_SLOTS:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid equipped slot")
-        if slot in EXCLUSIVE_SLOTS:
-            if slot in equipped_slots:
-                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Slot conflict: {slot}")
-            equipped_slots[slot] = template_id
 
-        strength_requirement = int(template.get("strengthRequirement") or 0)
-        if strength_requirement and strength < strength_requirement:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"{template_id} requires Strength {strength_requirement}",
-            )
+        if item.get("equipped"):
+            strength_requirement = int(template.get("strengthRequirement") or 0)
+            if strength_requirement and strength < strength_requirement:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"{template_id} requires Strength {strength_requirement}",
+                )
 
     if attuned_count > 3:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Attunement limit exceeded")
-
-    main_hand_template = ITEM_TEMPLATES.get(equipped_slots.get("mainHand"), {})
-    if "two-handed" in main_hand_template.get("properties", []) and ("offHand" in equipped_slots or "shield" in equipped_slots):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Two-handed weapons cannot be used with an off-hand item or shield",
-        )
 
 
 @router.post("/", response_model=CharacterResponse)

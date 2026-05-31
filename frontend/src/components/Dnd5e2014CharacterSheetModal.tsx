@@ -118,6 +118,11 @@ const MODIFIER_OPTIONS = [
   { value: 'savingThrows', label: 'Saving Throws' },
 ]
 const DEFENSIVE_ITEM_TYPES = ['armor', 'shield']
+const normalizeEquipmentSlot = (slot) => {
+  if (slot === 'mainHand' || slot === 'offHand') return 'weapon'
+  if (slot === 'carried') return 'gear'
+  return slot
+}
 const parseOptionList = (value) => String(value || '')
   .split(/[\n,]/)
   .map((item) => item.trim())
@@ -430,6 +435,36 @@ function CheckboxDropdown({ label, summary, children }: any) {
         {children}
       </div>
     </details>
+  )
+}
+
+function SlotPicker({ label, value, onChange, options }: any) {
+  const selected = options.find((option) => option.value === value) || options[0]
+
+  return (
+    <Field label={label}>
+      <details className="dnd-slot-picker">
+        <summary>
+          <strong>{selected?.label || 'Select Slot'}</strong>
+          <ChevronDown size={16} />
+        </summary>
+        <div className="dnd-slot-picker-menu">
+          {options.map((option) => (
+            <button
+              className={option.value === value ? 'active' : ''}
+              key={option.value}
+              type="button"
+              onClick={(event) => {
+                onChange(option.value)
+                event.currentTarget.closest('details')?.removeAttribute('open')
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </details>
+    </Field>
   )
 }
 
@@ -1099,6 +1134,11 @@ function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCanc
           items: items.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
         })
       }
+      const updateItemEquipped = (index, checked) => {
+        setSection('equipment', {
+          items: items.map((item, itemIndex) => (itemIndex === index ? { ...item, equipped: checked } : item)),
+        })
+      }
       const removeItem = (index) => {
         setSection('equipment', { items: items.filter((_, itemIndex) => itemIndex !== index) })
       }
@@ -1142,6 +1182,16 @@ function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCanc
         ['gold', 'GP'],
         ['platinum', 'PP'],
       ]
+      const ammunitionItems = items
+        .map((item) => ({ item, template: itemTemplatesById[item.itemTemplateId] }))
+        .filter(({ template }) => template?.type === 'ammunition')
+      const ammunitionOptions = [
+        { value: '', label: 'Select ammunition' },
+        ...ammunitionItems.map(({ item, template }) => ({
+          value: item.id,
+          label: `${template.name} (${Number(item.quantity) || 0})`,
+        })),
+      ]
 
       return (
         <div className="dnd-equipment-panel">
@@ -1158,6 +1208,16 @@ function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCanc
                 <article className="dnd-equipment-card" key={index}>
                   {(() => {
                     const template = itemTemplatesById[row.itemTemplateId] || itemTemplates[0]
+                    const isAmmunitionWeapon = template?.type === 'weapon'
+                      && (template.properties || []).map((property) => String(property).toLowerCase()).includes('ammunition')
+                    const selectedAmmunitionStillExists = ammunitionItems.some(({ item }) => item.id === row.weaponData?.ammunitionItemId)
+                    const selectedAmmunitionItemId = selectedAmmunitionStillExists ? row.weaponData?.ammunitionItemId || '' : ''
+                    const updateWeaponData = (patch) => updateItem(index, {
+                      weaponData: {
+                        ...(row.weaponData || {}),
+                        ...patch,
+                      },
+                    })
                     return (
                       <>
                   <div className="dnd-equipment-card-head">
@@ -1166,7 +1226,11 @@ function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCanc
                       <strong>{template.name}</strong>
                     </div>
                     <label className="dnd-equipment-equipped">
-                      <input type="checkbox" checked={row.equipped} onChange={(event) => updateItem(index, { equipped: event.target.checked })} />
+                      <input
+                        type="checkbox"
+                        checked={row.equipped}
+                        onChange={(event) => updateItemEquipped(index, event.target.checked)}
+                      />
                       <span>Equipped</span>
                     </label>
                     <label className="dnd-equipment-equipped">
@@ -1177,12 +1241,29 @@ function Dnd5e2014CharacterSheetModal({ isOpen, initialCharacter, onSave, onCanc
                   </div>
                   <div className="dnd-equipment-card-body">
                     <TextInput label="Quantity" type="number" min="0" value={row.quantity} onChange={(value) => updateItem(index, { quantity: Math.max(0, Number(value) || 0) })} />
-                    <SelectInput
+                    <SlotPicker
                       label="Slot"
-                      value={row.slot}
+                      value={normalizeEquipmentSlot(row.slot)}
                       onChange={(value) => updateItem(index, { slot: value })}
                       options={EQUIPMENT_SLOTS}
                     />
+                    {isAmmunitionWeapon && (
+                      <>
+                        <SelectInput
+                          label="Ammunition"
+                          value={selectedAmmunitionItemId}
+                          onChange={(value) => updateWeaponData({ ammunitionItemId: value })}
+                          options={ammunitionOptions}
+                        />
+                        <TextInput
+                          label="Ammo Used"
+                          type="number"
+                          min="1"
+                          value={row.weaponData?.ammunitionPerAttack || 1}
+                          onChange={(value) => updateWeaponData({ ammunitionPerAttack: Math.max(1, Number(value) || 1) })}
+                        />
+                      </>
+                    )}
                     <div className="dnd-equipment-line-total">
                       <span>Line Weight</span>
                       <strong>{itemWeight(row, itemTemplates).toFixed(1)}</strong>
