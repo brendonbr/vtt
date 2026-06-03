@@ -4,7 +4,7 @@ from app.routers import vtt, dice, maps, media, users, campaigns, characters, it
 from app.websockets.router import router as ws_router
 from app.database import Base, engine
 from app.models import AdventureCampaign, CampaignParticipant, Dnd5e2014CharacterSheet, ItemTemplate, Tormenta20CharacterSheet, User
-from app.models.campaign import DEFAULT_GAME_SYSTEM
+from app.models.campaign import DEFAULT_GAME_SYSTEM, GAME_SYSTEM_ALIASES
 from config import CORS_ORIGINS
 
 
@@ -20,6 +20,11 @@ def ensure_sqlite_schema_updates():
             "UPDATE adventure_campaigns SET game_system = ? WHERE game_system IS NULL OR game_system = ?",
             (DEFAULT_GAME_SYSTEM, "D&D 5e"),
         )
+        for legacy_value, normalized_value in GAME_SYSTEM_ALIASES.items():
+            connection.exec_driver_sql(
+                "UPDATE adventure_campaigns SET game_system = ? WHERE game_system = ?",
+                (normalized_value, legacy_value),
+            )
         dnd_columns = [column[1] for column in connection.exec_driver_sql("PRAGMA table_info(dnd5e_2014_character_sheets)")]
         if dnd_columns and "sheet_data" not in dnd_columns:
             connection.exec_driver_sql("ALTER TABLE dnd5e_2014_character_sheets ADD COLUMN sheet_data JSON NOT NULL DEFAULT '{}'")

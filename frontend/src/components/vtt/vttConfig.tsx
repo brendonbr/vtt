@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 
 const PAGE_HOST = window.location.hostname
-const API_HOST = PAGE_HOST === '127.0.0.1' ? '127.0.0.1' : 'localhost'
+const API_HOST = PAGE_HOST === '0.0.0.0' ? '127.0.0.1' : PAGE_HOST
 
 export const API_BASE = `http://${API_HOST}:8002`
 export const WS_BASE = `ws://${API_HOST}:8002`
